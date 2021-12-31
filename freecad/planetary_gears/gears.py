@@ -28,6 +28,7 @@ class PlanetaryGearSet:
         obj.module = 1
         obj.planet_number = 5
         obj.pressure_angle = 20
+        obj.height = 5
 
         self.solve_for_planet(obj)
         self.update_computed(obj)
@@ -47,6 +48,7 @@ class PlanetaryGearSet:
         obj.addProperty("App::PropertyFloat", "module", "gearset_properties")
         obj.addProperty("App::PropertyAngle", "pressure_angle", "gearset_properties")
         obj.addProperty("App::PropertyInteger", "planet_number", "gearset_properties")
+        obj.addProperty("App::PropertyFloat", "height", "gearset_properties")
 
     def add_ring_properties(self, obj):
         obj.addProperty("App::PropertyInteger", "ring_teeth", "ring_properties")
@@ -133,7 +135,8 @@ class PlanetaryGearSet:
             "module",
             "beta",
             "double_helix",
-            "pressure_angle"
+            "pressure_angle",
+            "height"
         ]
 
         expression = f"<<{obj.Name}>>.ring_teeth"
