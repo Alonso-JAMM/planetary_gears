@@ -281,7 +281,8 @@ class PlanetaryGearSet:
         self.update_planets_placements(fp)
 
     def __getstate__(self):
-        return None
+        return self.gearset.Name, len(self.planet_gears_links)
 
     def __setstate__(self, state):
-        return None
+        self.gearset = App.ActiveDocument.getObject(state[0])
+        self.planet_gears_links = [ self.gearset.getObject(f"planet{str(i)}") for i in range(1, state[1] + 1) ]
