@@ -118,17 +118,20 @@ class PlanetaryGearSet:
         self.planet_gears_links = []
 
         for i in range(1, obj.planet_number + 1):
-            planet_link = self.gearset.newObject("App::Link", f"planet{str(i)}")
-            planet_link.setLink(self.planet_gear_body)
-            expression = f"<<{obj.Name}>>.planet_{i}_position_x"
-            planet_link.setExpression("Placement.Base.x", expression)
-            expression = f"<<{obj.Name}>>.planet_{i}_position_y"
-            planet_link.setExpression("Placement.Base.y", expression)
-            expression = f"<<{obj.Name}>>.planet_{i}_position_angle"
-            planet_link.setExpression("Placement.Rotation.Yaw", expression)
-            expression = f"-<<{self.planet_gear.Name}>>.height/2"
-            planet_link.setExpression("Placement.Base.z", expression)
-            self.planet_gears_links.append(planet_link)
+            self.create_planet_link(obj, i)
+
+    def create_planet_link(self, obj, i):
+        planet_link = self.gearset.newObject("App::Link", f"planet{str(i)}")
+        planet_link.setLink(self.planet_gear_body)
+        expression = f"<<{obj.Name}>>.planet_{i}_position_x"
+        planet_link.setExpression("Placement.Base.x", expression)
+        expression = f"<<{obj.Name}>>.planet_{i}_position_y"
+        planet_link.setExpression("Placement.Base.y", expression)
+        expression = f"<<{obj.Name}>>.planet_{i}_position_angle"
+        planet_link.setExpression("Placement.Rotation.Yaw", expression)
+        expression = f"-<<{self.planet_gear.Name}>>.height/2"
+        planet_link.setExpression("Placement.Base.z", expression)
+        self.planet_gears_links.append(planet_link)
 
     def add_gear_expressions(self, obj):
         parameters = [
@@ -235,50 +238,30 @@ class PlanetaryGearSet:
             val = obj.theta * (1 - obj.ringPlanetRatio) + obj.ring_angle
             setattr(obj, f"planet_{i}_position_angle", val.Value)
 
-        if len(self.planet_gears_links) > planet_n:
-            # there are more links than needed, removed extra
-            for planet_link in self.planet_gears_links[planet_n:]:
-                # To avoid errors about properties not existing due to the
-                # document not being fully recomputed yet we remove the
-                # expressions first
-                planet_link.setExpression("Placement.Base.x", None)
-                planet_link.setExpression("Placement.Base.y", None)
-                planet_link.setExpression("Placement.Rotation.Yaw", None)
-                App.ActiveDocument.removeObject(planet_link.Name)
-            self.planet_gears_links = self.planet_gears_links[:planet_n]
-        elif len(self.planet_gears_links) < planet_n:
-            # there are less links than needed, add extra
-            for i in range(len(self.planet_gears_links) + 1, planet_n + 1):
-                planet_link = self.gearset.newObject("App::Link", f"planet{str(i)}")
-                planet_link.setLink(self.planet_gear_body)
-                # This will set the new link gear in the correct position
-                # however, it will touched and need to recompute
-                val = getattr(obj, f"planet_{i}_position_x")
-                planet_link.Placement.Base.x = val
-                val = getattr(obj, f"planet_{i}_position_y")
-                planet_link.Placement.Base.y = val
-                val = getattr(obj, f"planet_{i}_position_angle")
-                planet_link.Placement.Rotation.Yaw = val
-                val = -self.planet_gear.height/2
-                planet_link.Placement.Base.z = val
-
-                expression = f"<<{obj.Name}>>.planet_{i}_position_x"
-                planet_link.setExpression("Placement.Base.x", expression)
-                expression = f"<<{obj.Name}>>.planet_{i}_position_y"
-                planet_link.setExpression("Placement.Base.y", expression)
-                expression = f"<<{obj.Name}>>.planet_{i}_position_angle"
-                planet_link.setExpression("Placement.Rotation.Yaw", expression)
-                expression = f"-<<{self.planet_gear.Name}>>.height/2"
-                planet_link.setExpression("Placement.Base.z", expression)
-                self.planet_gears_links.append(planet_link)
-
         for prop in properties:
             obj.removeProperty(prop)
+
+    def adjust_planet_number(self, fp):
+        planet_n = fp.planet_number
+        current_planets_n = len(self.planet_gears_links)
+
+        if current_planets_n > planet_n:
+            for i in range(planet_n, current_planets_n):
+                planet_link = self.planet_gears_links.pop()
+                App.ActiveDocument.removeObject(planet_link.Name)
+
+        elif len(self.planet_gears_links) < planet_n:
+            for i in range(current_planets_n+1, planet_n+1):
+                self.create_planet_link(fp, i)
 
     def execute(self, fp):
         self.update_gears_teeth(fp)
         self.update_computed(fp)
         self.update_planets_placements(fp)
+
+    def onChanged(self, fp, prop):
+        if prop == "planet_number":
+            self.adjust_planet_number(fp)
 
     def __getstate__(self):
         return self.gearset.Name, len(self.planet_gears_links)
