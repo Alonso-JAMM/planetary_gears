@@ -14,7 +14,12 @@ class PlanetaryGearSet:
         self.gearset = gearset
 
         self.gears_group = self.gearset.newObject("App::DocumentObjectGroup", "Gears")
+        self.planet_gears_links = []
 
+        self.planet_gear_name = ""
+        # only used when creating the gears
+        self.sun_gear_name = ""
+        self.ring_gear_name = ""
 
         self.add_gearset_properties(obj)
         self.add_ring_properties(obj)
@@ -60,9 +65,6 @@ class PlanetaryGearSet:
 
     def add_planet_properties(self, obj):
         obj.addProperty("App::PropertyInteger", "planet_teeth", "planet_properties")
-        #for i in range(1, obj.planet_number):
-            #name = f"planet_{i}_position"
-            #obj.addProperty("App::PropertyInteger", name, "planet_placement")
 
     def add_computed_properties(self, obj):
         obj.addProperty("App::PropertyFloat", "sun_dw", "computed", "", 4)
@@ -75,61 +77,65 @@ class PlanetaryGearSet:
         obj.addProperty("App::PropertyAngle", "theta", "computed", "", 4)
 
     def create_ring_gear(self, obj):
-        self.ring_gear_body = self.gears_group.newObject("PartDesign::Body", "ring_gear")
-        self.ring_gear_body.Visibility = False
-        self.ring_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
-        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", self.ring_gear_body)
-        self.ring_gear = CreateInternalInvoluteGear.create()
-        # gear parameters
+        ring_gear_body = self.gears_group.newObject("PartDesign::Body", "ring_gear")
+        ring_gear_body.Visibility = False
+        ring_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
+        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", ring_gear_body)
+        ring_gear = CreateInternalInvoluteGear.create()
+        self.ring_gear_name = ring_gear.Name
 
         # now add the link object which is shown in the "assembly" of the gearset
-        self.ring_gear_link = self.gearset.newObject("App::Link", "ring")
-        self.ring_gear_link.setLink(self.ring_gear_body)
+        ring_gear_link = self.gearset.newObject("App::Link", "ring")
+        ring_gear_link.setLink(ring_gear_body)
         expression = f"<<{obj.Name}>>.ring_angle"
-        self.ring_gear_link.setExpression("Placement.Rotation.Yaw", expression)
-        expression = f"-<<{self.ring_gear.Name}>>.height/2"
-        self.ring_gear_link.setExpression("Placement.Base.z", expression)
+        ring_gear_link.setExpression("Placement.Rotation.Yaw", expression)
+        expression = f"-<<{ring_gear.Name}>>.height/2"
+        ring_gear_link.setExpression("Placement.Base.z", expression)
 
     def create_sun_gear(self, obj):
-        self.sun_gear_body = self.gears_group.newObject("PartDesign::Body", "sun_gear")
-        self.sun_gear_body.Visibility = False
-        self.sun_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
-        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", self.sun_gear_body)
-        self.sun_gear = CreateInvoluteGear.create()
-        self.sun_gear.teeth = obj.sun_teeth
-        self.sun_gear.module = obj.module
+        sun_gear_body = self.gears_group.newObject("PartDesign::Body", "sun_gear")
+        sun_gear_body.Visibility = False
+        sun_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
+        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", sun_gear_body)
+        sun_gear = CreateInvoluteGear.create()
+        sun_gear.teeth = obj.sun_teeth
+        sun_gear.module = obj.module
+        self.sun_gear_name = sun_gear.Name
 
         # link sun gear
-        self.sun_gear_link = self.gearset.newObject("App::Link", "sun")
-        self.sun_gear_link.setLink(self.sun_gear_body)
+        sun_gear_link = self.gearset.newObject("App::Link", "sun")
+        sun_gear_link.setLink(sun_gear_body)
         expression = f"<<{obj.Name}>>.sun_angle"
-        self.sun_gear_link.setExpression("Placement.Rotation.Yaw", expression)
-        expression = f"-<<{self.sun_gear.Name}>>.height/2"
-        self.sun_gear_link.setExpression("Placement.Base.z", expression)
+        sun_gear_link.setExpression("Placement.Rotation.Yaw", expression)
+        expression = f"-<<{sun_gear.Name}>>.height/2"
+        sun_gear_link.setExpression("Placement.Base.z", expression)
 
     def create_planet_gear(self, obj):
-        self.planet_gear_body = self.gears_group.newObject("PartDesign::Body", "planet_gear")
-        self.planet_gear_body.Visibility = False
-        self.planet_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
-        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", self.planet_gear_body)
-        self.planet_gear = CreateInvoluteGear.create()
-        self.planet_gear.teeth = obj.planet_teeth
-        self.planet_gear.module = obj.module
+        planet_gear_body = self.gears_group.newObject("PartDesign::Body", "planet_gear")
+        planet_gear_body.Visibility = False
+        planet_gear_body.newObject("PartDesign::CoordinateSystem", "Center")
+        Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", planet_gear_body)
+        planet_gear = CreateInvoluteGear.create()
+        planet_gear.teeth = obj.planet_teeth
+        planet_gear.module = obj.module
         self.planet_gears_links = []
+        self.planet_gear_name = planet_gear.Name
 
         for i in range(1, obj.planet_number + 1):
             self.create_planet_link(obj, i)
 
     def create_planet_link(self, obj, i):
+        planet_gear = App.ActiveDocument.getObject(self.planet_gear_name)
+        planet_gear_body = App.ActiveDocument.getObject("planet_gear")
         planet_link = self.gearset.newObject("App::Link", f"planet{str(i)}")
-        planet_link.setLink(self.planet_gear_body)
+        planet_link.setLink(planet_gear_body)
         expression = f"<<{obj.Name}>>.planet_{i}_position_x"
         planet_link.setExpression("Placement.Base.x", expression)
         expression = f"<<{obj.Name}>>.planet_{i}_position_y"
         planet_link.setExpression("Placement.Base.y", expression)
         expression = f"<<{obj.Name}>>.planet_{i}_position_angle"
         planet_link.setExpression("Placement.Rotation.Yaw", expression)
-        expression = f"-<<{self.planet_gear.Name}>>.height/2"
+        expression = f"-<<{planet_gear.Name}>>.height/2"
         planet_link.setExpression("Placement.Base.z", expression)
         self.planet_gears_links.append(planet_link)
 
@@ -142,22 +148,26 @@ class PlanetaryGearSet:
             "height"
         ]
 
+        ring_gear = App.ActiveDocument.getObject(self.ring_gear_name)
+        sun_gear = App.ActiveDocument.getObject(self.sun_gear_name)
+        planet_gear = App.ActiveDocument.getObject(self.planet_gear_name)
+
         expression = f"<<{obj.Name}>>.ring_teeth"
-        self.ring_gear.setExpression("teeth", expression)
+        ring_gear.setExpression("teeth", expression)
         expression = f"<<{obj.Name}>>.sun_teeth"
-        self.sun_gear.setExpression("teeth", expression)
+        sun_gear.setExpression("teeth", expression)
         expression = f"<<{obj.Name}>>.planet_teeth"
-        self.planet_gear.setExpression("teeth", expression)
+        planet_gear.setExpression("teeth", expression)
 
         for param in parameters:
             expression = f"<<{obj.Name}>>.{param}"
-            self.ring_gear.setExpression(param, expression)
-            self.sun_gear.setExpression(param, expression)
-            self.planet_gear.setExpression(param, expression)
+            ring_gear.setExpression(param, expression)
+            sun_gear.setExpression(param, expression)
+            planet_gear.setExpression(param, expression)
 
         # sun beta has to be negative
         expression = f"-<<{obj.Name}>>.beta"
-        self.sun_gear.setExpression("beta", expression)
+        sun_gear.setExpression("beta", expression)
 
     def solve_for_planet(self, obj):
         obj.setEditorMode("planet_teeth", 1)
@@ -264,8 +274,10 @@ class PlanetaryGearSet:
             self.adjust_planet_number(fp)
 
     def __getstate__(self):
-        return self.gearset.Name, len(self.planet_gears_links)
+        return (self.gearset.Name, len(self.planet_gears_links),
+                self.planet_gear_name)
 
     def __setstate__(self, state):
         self.gearset = App.ActiveDocument.getObject(state[0])
         self.planet_gears_links = [ self.gearset.getObject(f"planet{str(i)}") for i in range(1, state[1] + 1) ]
+        self.planet_gear_name = state[2]
