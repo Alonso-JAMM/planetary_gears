@@ -47,7 +47,8 @@ class PlanetaryGearSet:
         obj.Proxy = self
 
     def add_gearset_properties(self, obj):
-        obj.addProperty("App::PropertyString", "solve_for", "gearset_properties", "Choose between: planet, sun, ring")
+        obj.addProperty("App::PropertyEnumeration", "solve_for", "gearset_properties", "Choose between: planet, sun, ring")
+        obj.solve_for = ["planet", "sun", "ring"]
         obj.addProperty("App::PropertyAngle", "beta", "gearset_properties")
         obj.addProperty("App::PropertyBool", "double_helix", "gearset_properties")
         obj.addProperty("App::PropertyFloat", "module", "gearset_properties")
