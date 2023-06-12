@@ -74,8 +74,8 @@ class PlanetaryGearSet:
         obj.addProperty("App::PropertyFloat", "planetCenterDistance", "computed", "", 4)
         obj.addProperty("App::PropertyFloat", "ringPlanetRatio", "computed", "", 4)
         obj.addProperty("App::PropertyFloat", "transmissionRatio", "computed", "", 4)
-        obj.addProperty("App::PropertyAngle", "theta_0", "computed", "", 4)
         obj.addProperty("App::PropertyAngle", "theta", "computed", "", 4)
+        obj.addProperty("App::PropertyAngle", "sun_angle_0", "computed", "", 4)
 
     def create_ring_gear(self, obj):
         ring_gear_body = self.gears_group.newObject("PartDesign::Body", "ring_gear")
@@ -106,7 +106,7 @@ class PlanetaryGearSet:
         # link sun gear
         sun_gear_link = self.gearset.newObject("App::Link", "sun")
         sun_gear_link.setLink(sun_gear_body)
-        expression = f"<<{obj.Name}>>.sun_angle"
+        expression = f"<<{obj.Name}>>.sun_angle + <<{obj.Name}>>.sun_angle_0"
         sun_gear_link.setExpression("Placement.Rotation.Yaw", expression)
         expression = f"-<<{sun_gear.Name}>>.height/2"
         sun_gear_link.setExpression("Placement.Base.z", expression)
@@ -170,14 +170,21 @@ class PlanetaryGearSet:
         expression = f"-<<{obj.Name}>>.beta"
         sun_gear.setExpression("beta", expression)
 
+    def check_valid_teeth(self, obj):
+        # Check the equal spacing condition
+        k = (obj.sun_teeth + obj.ring_teeth) / obj.planet_number
+        if k.is_integer() is False:
+            App.Console.PrintWarning("This configuration doesn't allow equally spaced planets\n")
+
     def solve_for_planet(self, obj):
         obj.setEditorMode("planet_teeth", 1)
         obj.setEditorMode("sun_teeth", 0)
         obj.setEditorMode("ring_teeth", 0)
         planet_teeth = (obj.ring_teeth - obj.sun_teeth)/2
 
+        # Check the center distance condition
         if planet_teeth.is_integer() is False:
-            App.Console.PrintMessage("This configuration of sun and ring gears is not allowed")
+            App.Console.PrintWarning("This configuration of sun and ring gears is not allowed\n")
         else:
             obj.planet_teeth = int(planet_teeth)
 
@@ -202,6 +209,7 @@ class PlanetaryGearSet:
             self.solve_for_sun(obj)
         elif obj.solve_for == "ring":
             self.solve_for_ring(obj)
+        self.check_valid_teeth(obj)
 
     def update_computed(self, obj):
         obj.ring_dw = obj.module * obj.ring_teeth
@@ -209,21 +217,28 @@ class PlanetaryGearSet:
         obj.planet_dw = obj.module * obj.planet_teeth
 
         obj.planetCenterDistance = (obj.planet_dw + obj.sun_dw)/2
+
+        # it's easier to adjust the sun rotation if it doesn't mesh when
+        # the gars at initial position
+        # return
+        if obj.planet_teeth % 2 == 0:
+            # need to rotate the sun gear one tooth to the next root
+            obj.sun_angle_0 = 360 / (2 * obj.sun_teeth)
+        else:
+            obj.sun_angle_0 = 0
+
+        # Rotation angle of the first planet gear with respect to x-axis
+        obj.theta = (obj.ring_angle*obj.ring_teeth + obj.sun_angle*obj.sun_teeth) / (obj.ring_teeth + obj.sun_teeth)
+
         obj.ringPlanetRatio = obj.ring_teeth / obj.planet_teeth
-        obj.theta_0 = 180/(obj.ring_teeth + obj.sun_teeth)*(2 - (obj.planet_teeth + 1) % 2)
         obj.transmissionRatio = obj.ring_teeth/obj.sun_teeth + 1
-        obj.theta = obj.sun_angle / obj.transmissionRatio + obj.theta_0 - obj.ring_angle / obj.transmissionRatio
 
     def update_planets_placements(self, obj):
         planet_n = obj.planet_number
         properties = [k for k in obj.PropertiesList if "position" in k]
 
-        theta_0 = obj.theta_0
-        n = 180 / (2*theta_0*planet_n)
-
         for i in range(1, planet_n + 1):
             prop_names = [
-                #f"planet_{i}_position",
                 f"planet_{i}_position_x",
                 f"planet_{i}_position_y",
                 f"planet_{i}_position_angle",
@@ -238,16 +253,23 @@ class PlanetaryGearSet:
 
             # update planet position factors to try to put all the planets
             # around the sun
-            planet_pos = int(n*i)
 
-            # update planet placement values
-            angle = pi/180*(obj.theta + obj.ring_angle + 4 * obj.theta_0 * planet_pos)
+            # angle with respect to the x-axis formed by the placement of this
+            # planet
+            planet_angle_offset = 2*pi/planet_n * (i-1)
+            angle = pi/180*obj.theta.Value + planet_angle_offset
+
             val = obj.planetCenterDistance * cos(angle)
             setattr(obj, f"planet_{i}_position_x", val)
             val = obj.planetCenterDistance * sin(angle)
             setattr(obj, f"planet_{i}_position_y", val)
-            val = obj.theta * (1 - obj.ringPlanetRatio) + obj.ring_angle
-            setattr(obj, f"planet_{i}_position_angle", val.Value)
+
+            # need to adjust the planet rotation on its own axis in order to no
+            # cause any interference problems
+            # this method works on all cases I tried but I am not sure if it is
+            # right
+            val = -obj.sun_dw*obj.sun_angle.Value / (2*obj.planet_dw)
+            setattr(obj, f"planet_{i}_position_angle", val)
 
         for prop in properties:
             obj.removeProperty(prop)
