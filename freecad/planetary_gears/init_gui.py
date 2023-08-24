@@ -5,8 +5,8 @@ from freecad.planetary_gears import ICONPATH
 
 
 class PlanetaryGearsWorkbench(Gui.Workbench):
-    MenuText = "planetary gears"
-    ToolTip = "planetary gears workbench"
+    MenuText = "Planetary Gears"
+    ToolTip = "Planetary Gears Workbench"
     Icon = os.path.join(ICONPATH, "Gear.svg")
     toolbox = [
         "PlanetaryGearCalculatorCmd"
@@ -21,9 +21,9 @@ class PlanetaryGearsWorkbench(Gui.Workbench):
         here is the place to import all the commands
         """
         from freecad.planetary_gears.commands import PlanetaryGearCalculatorCmd
-        App.Console.PrintMessage("Initializing planetary gearbox workbench")
-        self.appendToolbar("Gear", self.toolbox)
-        self.appendMenu("Gear", self.toolbox)
+        App.Console.PrintMessage("Initializing planetary gearbox workbench.\n")
+        self.appendToolbar("Planetary Gears", self.toolbox)
+        self.appendMenu("Planetary Gears", self.toolbox)
         Gui.addCommand("PlanetaryGearCalculatorCmd", PlanetaryGearCalculatorCmd())
 
     def Activated(self):
