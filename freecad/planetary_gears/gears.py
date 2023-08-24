@@ -25,6 +25,7 @@ class PlanetaryGearSet:
         self.add_ring_properties(obj)
         self.add_sun_properties(obj)
         self.add_planet_properties(obj)
+        self.add_ratio_properties(obj)
         self.add_computed_properties(obj)
 
         obj.ring_teeth = 53
@@ -34,6 +35,8 @@ class PlanetaryGearSet:
         obj.planet_number = 5
         obj.pressure_angle = 20
         obj.height = 5
+        obj.driving = "sun"
+        obj.driven = "planet carrier"
 
         self.solve_for_planet(obj)
         self.update_computed(obj)
@@ -63,17 +66,25 @@ class PlanetaryGearSet:
     def add_sun_properties(self, obj):
         obj.addProperty("App::PropertyInteger", "sun_teeth", "sun_properties")
         obj.addProperty("App::PropertyAngle", "sun_angle", "sun_properties")
+        obj.addProperty("App::PropertyFloat", "sun_clearance", "sun_properties", "Decrease the gear size by this amount.")
 
     def add_planet_properties(self, obj):
         obj.addProperty("App::PropertyInteger", "planet_teeth", "planet_properties")
+        obj.addProperty("App::PropertyFloat", "planet_clearance", "planet_properties", "Decrease the gear size by this amount.")
+
+    def add_ratio_properties(self, obj):
+        obj.addProperty("App::PropertyEnumeration", "driving", "ratio_properties", "The input gear.")
+        obj.driving = ["sun", "ring", "planet carrier"]
+        obj.addProperty("App::PropertyEnumeration", "driven", "ratio_properties", "The output gear. The third piece will be stationary.")
+        obj.driven = ["sun", "ring", "planet carrier"]
+        obj.addProperty("App::PropertyFloat", "ratio", "ratio_properties", "The output ratio.")
+        obj.setEditorMode("ratio", 1)
 
     def add_computed_properties(self, obj):
         obj.addProperty("App::PropertyFloat", "sun_dw", "computed", "", 4)
         obj.addProperty("App::PropertyFloat", "ring_dw", "computed", "", 4)
         obj.addProperty("App::PropertyFloat", "planet_dw", "computed", "", 4)
         obj.addProperty("App::PropertyFloat", "planetCenterDistance", "computed", "", 4)
-        obj.addProperty("App::PropertyFloat", "ringPlanetRatio", "computed", "", 4)
-        obj.addProperty("App::PropertyFloat", "transmissionRatio", "computed", "", 4)
         obj.addProperty("App::PropertyAngle", "theta", "computed", "", 4)
         obj.addProperty("App::PropertyAngle", "sun_angle_0", "computed", "", 4)
 
@@ -142,7 +153,6 @@ class PlanetaryGearSet:
 
     def add_gear_expressions(self, obj):
         parameters = [
-            "module",
             "beta",
             "double_helix",
             "pressure_angle",
@@ -160,6 +170,14 @@ class PlanetaryGearSet:
         expression = f"<<{obj.Name}>>.planet_teeth"
         planet_gear.setExpression("teeth", expression)
 
+        # Apply clearances.
+        expression = f"<<{obj.Name}>>.module"
+        ring_gear.setExpression("module", expression)
+        expression = f"<<{obj.Name}>>.module * (1 - <<{obj.Name}>>.sun_clearance)"
+        sun_gear.setExpression("module", expression)
+        expression = f"<<{obj.Name}>>.module * (1 - <<{obj.Name}>>.planet_clearance)"
+        planet_gear.setExpression("module", expression)
+
         for param in parameters:
             expression = f"<<{obj.Name}>>.{param}"
             ring_gear.setExpression(param, expression)
@@ -174,7 +192,7 @@ class PlanetaryGearSet:
         # Check the equal spacing condition
         k = (obj.sun_teeth + obj.ring_teeth) / obj.planet_number
         if k.is_integer() is False:
-            App.Console.PrintWarning("This configuration doesn't allow equally spaced planets\n")
+            App.Console.PrintWarning("This configuration doesn't allow equally spaced planets.\n")
 
     def solve_for_planet(self, obj):
         obj.setEditorMode("planet_teeth", 1)
@@ -184,7 +202,7 @@ class PlanetaryGearSet:
 
         # Check the center distance condition
         if planet_teeth.is_integer() is False:
-            App.Console.PrintWarning("This configuration of sun and ring gears is not allowed\n")
+            App.Console.PrintWarning("This configuration of sun and ring gears is not allowed.\n")
         else:
             obj.planet_teeth = int(planet_teeth)
 
@@ -230,8 +248,28 @@ class PlanetaryGearSet:
         # Rotation angle of the first planet gear with respect to x-axis
         obj.theta = (obj.ring_angle*obj.ring_teeth + obj.sun_angle*obj.sun_teeth) / (obj.ring_teeth + obj.sun_teeth)
 
-        obj.ringPlanetRatio = obj.ring_teeth / obj.planet_teeth
-        obj.transmissionRatio = obj.ring_teeth/obj.sun_teeth + 1
+        # Calculate gear ratio.
+        if obj.driving == obj.driven:
+            App.Console.PrintWarning("Driving and driven gears must be different.\n")
+
+        driving = 1
+        driven = 1
+        planet_carrier = obj.ring_teeth + obj.sun_teeth
+        if obj.driving == "sun":
+            driving = obj.sun_teeth
+        elif obj.driving == "ring":
+            driving = obj.ring_teeth
+        elif obj.driving == "planet carrier":
+            driving = planet_carrier
+
+        if obj.driven == "sun":
+            driven = obj.sun_teeth
+        elif obj.driven == "ring":
+            driven = obj.ring_teeth
+        elif obj.driven == "planet carrier":
+            driven = planet_carrier
+
+        obj.ratio = driven / driving
 
     def update_planets_placements(self, obj):
         planet_n = obj.planet_number
